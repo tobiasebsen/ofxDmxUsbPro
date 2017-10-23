@@ -69,8 +69,8 @@ public:
 	RdmMessage(std::vector<uint8_t> & msg);
 	RdmMessage(RdmUid uid, uint8_t cc, uint16_t pid);
 
-	void setDestination(RdmUid & uid);
-	void setSource(RdmUid & uid);
+	void setDestination(const RdmUid & uid);
+    void setSource(const RdmUid & uid);
 	void setResponseType(uint8_t rtype);
 	void setPortID(uint8_t portid);
 	void setCommandClass(uint8_t cc);
@@ -78,7 +78,7 @@ public:
 	void setDataLength(uint8_t length);
 	void setData(void * data);
 	void setData(void * data, uint8_t length);
-	void copyData(void * data, uint8_t length, uint8_t offset = 0);
+	void copyDataFrom(void * data, uint8_t length, uint8_t offset = 0);
 
 	RdmUid getSource();
 	uint8_t getCommandClass();
