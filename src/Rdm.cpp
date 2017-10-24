@@ -19,12 +19,12 @@ RdmMessage::RdmMessage(RdmUid uid, uint8_t cc, uint16_t pid) {
 	updateChecksum();
 }
 
-void RdmMessage::setDestination(RdmUid & uid) {
+void RdmMessage::setDestination(const RdmUid & uid) {
 	RdmHeader * header = getHeader();
 	memcpy(header->destUid.uid, uid.uid, sizeof(RdmUid));
 }
 
-void RdmMessage::setSource(RdmUid & uid) {
+void RdmMessage::setSource(const RdmUid & uid) {
 	RdmHeader * header = getHeader();
 	memcpy(header->srcUid.uid, uid.uid, sizeof(RdmUid));
 }
@@ -247,17 +247,6 @@ void RdmDiscovery(RdmMessage & msg, const RdmUid & lowerBound, const RdmUid & up
 	msg.setDataLength(12);
 	msg.copyDataFrom(lowerBound.uid, sizeof(RdmUid), 0);
 	msg.copyDataFrom(upperBound.uid, sizeof(RdmUid), 6);
-	msg.updateChecksum();
-}
-
-void RdmUnMute(RdmMessage & msg) {
-	RdmUid dst = RdmAllDevicesUid();
-	msg.setDestination(dst);
-	msg.setSource(dst);
-	msg.setPortID(1);
-	msg.setCommandClass(DISCOVERY_COMMAND);
-	msg.setParameterID(DISC_UN_MUTE);
-	msg.setDataLength(0);
 	msg.updateChecksum();
 }
 

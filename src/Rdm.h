@@ -73,8 +73,8 @@ public:
 	RdmMessage(std::vector<uint8_t> & msg);
 	RdmMessage(RdmUid uid, uint8_t cc, uint16_t pid);
 
-	void setDestination(RdmUid & uid);
-	void setSource(RdmUid & uid);
+	void setDestination(const RdmUid & uid);
+    void setSource(const RdmUid & uid);
 	void setTransactionNumber(uint8_t tn);
 	void setResponseType(uint8_t rtype);
 	void setPortID(uint8_t portid);
