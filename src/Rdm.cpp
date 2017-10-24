@@ -29,6 +29,11 @@ void RdmMessage::setSource(const RdmUid & uid) {
 	memcpy(header->srcUid.uid, uid.uid, sizeof(RdmUid));
 }
 
+void RdmMessage::setTransactionNumber(uint8_t tn) {
+	RdmHeader * header = getHeader();
+	header->tn = tn;
+}
+
 void RdmMessage::setResponseType(uint8_t rtype) {
 	RdmHeader * header = getHeader();
 	header->responseType = rtype;
@@ -70,13 +75,18 @@ void RdmMessage::setData(void * data, uint8_t length) {
 	setData(data);
 }
 
-void RdmMessage::copyDataFrom(void * data, uint8_t length, uint8_t offset) {
+void RdmMessage::copyDataFrom(const void * data, uint8_t length, uint8_t offset) {
 	memcpy(message.data() + sizeof(RdmHeader) + offset, data, length);
 }
 
 RdmUid RdmMessage::getSource() {
 	RdmHeader * header = getHeader();
 	return header->srcUid;
+}
+
+uint8_t RdmMessage::getTransactionNumber() {
+	RdmHeader * header = getHeader();
+	return header->tn;
 }
 
 uint8_t RdmMessage::getCommandClass() {
@@ -98,8 +108,23 @@ void * RdmMessage::getData() {
 	return message.data() + sizeof(RdmHeader);
 }
 
-string RdmMessage::getDataAsString() {
-	return string((char*)getData(), getDataLength());
+uint8_t * RdmMessage::getDataBytes() {
+	return message.data() + sizeof(RdmHeader);
+}
+
+string RdmMessage::getDataAsString(uint8_t offset) {
+	return string((char*)getData() + offset, getDataLength() - offset);
+}
+
+uint16_t RdmMessage::getDataAsUint16(uint8_t offset) {
+	uint8_t * data = getDataBytes() + offset;
+	return data[1] << 8 | data[0];
+}
+
+RdmUid RdmMessage::getDataAsUid(uint8_t offset) {
+	RdmUid uid;
+	memcpy(uid.uid, getDataBytes() + offset, sizeof(RdmUid));
+	return uid;
 }
 
 uint16_t RdmMessage::calcChecksum() {
@@ -168,13 +193,51 @@ RdmUid RdmDecodeUid(uint8_t * euid) {
 	return uid;
 }
 
-std::string RdmUidToString(RdmUid & uid) {
+bool RdmDecodeUid(uint8_t * euid, RdmUid & uid) {
+	uint8_t j = 0;
+	while (j < 8 && euid[j] == 0xFE)
+		j++;
+	if (euid[j] != 0xAA) {
+		return false;
+	}
+	j++;
+	uint16_t csEuid = 0;
+	for (int i=0; i<6; i++) {
+		uid.uid[i] = euid[j] & euid[j+1];
+		csEuid += euid[j];
+		csEuid += euid[j+1];
+		j += 2;
+	}
+	uint16_t csValid = ((euid[j+0] & euid[j+1]) << 8) | (euid[j+2] & euid[j+3]);
+
+	if (csEuid != csValid) {
+		return false;
+	}
+	return true;
+}
+
+std::string RdmUidToString(const RdmUid & uid) {
 	char sz[13];
 	sprintf(sz, "%02X%02X%02X%02X%02X%02X", uid.uid[0], uid.uid[1], uid.uid[2], uid.uid[3], uid.uid[4], uid.uid[5]);
 	return std::string(sz);
 }
 
-void RdmDiscovery(RdmMessage & msg) {
+uint64_t RdmUidToUint64(const RdmUid & uid) {
+	return uid.uid[0] << 40 | uid.uid[1] << 32 | uid.uid[2] << 24 | uid.uid[3] << 16 | uid.uid[4] << 8 | uid.uid[5];
+}
+
+RdmUid RdmUidFromUint64(uint64_t i) {
+	RdmUid uid;
+	uid.uid[0] = (i >> 40) & 0xFF;
+	uid.uid[1] = (i >> 32) & 0xFF;
+	uid.uid[2] = (i >> 24) & 0xFF;
+	uid.uid[3] = (i >> 16) & 0xFF;
+	uid.uid[4] = (i >> 8) & 0xFF;
+	uid.uid[5] = (i >> 0) & 0xFF;
+	return uid;
+}
+
+void RdmDiscovery(RdmMessage & msg, const RdmUid & lowerBound, const RdmUid & upperBound) {
 	RdmUid dst = RdmAllDevicesUid();
 	msg.setDestination(dst);
 	msg.setSource(dst);
@@ -182,8 +245,8 @@ void RdmDiscovery(RdmMessage & msg) {
 	msg.setCommandClass(DISCOVERY_COMMAND);
 	msg.setParameterID(DISC_UNIQUE_BRANCH);
 	msg.setDataLength(12);
-	msg.copyDataFrom(RdmZeroUid().uid, sizeof(RdmUid), 0);
-	msg.copyDataFrom(RdmAllDevicesUid().uid, sizeof(RdmUid), 6);
+	msg.copyDataFrom(lowerBound.uid, sizeof(RdmUid), 0);
+	msg.copyDataFrom(upperBound.uid, sizeof(RdmUid), 6);
 	msg.updateChecksum();
 }
 

@@ -28,6 +28,10 @@ using namespace std;
 #define STATUS_MESSAGES				0x0030
 #define SUPPORTED_PARAMETERS		0x0050
 #define PARAMETER_DESCRIPTION		0x0051
+#define DEVICE_INFO					0x0060
+#define SOFTWARE_VERSION_LABEL		0x00C0
+#define DMX_START_ADDRESS			0x00F0
+#define IDENTIFY_DEVICE				0x1000
 
 #define STATUS_NONE					0x00
 #define STATUS_GET_LAST_MESSAGE		0x01
@@ -71,6 +75,7 @@ public:
 
 	void setDestination(const RdmUid & uid);
     void setSource(const RdmUid & uid);
+	void setTransactionNumber(uint8_t tn);
 	void setResponseType(uint8_t rtype);
 	void setPortID(uint8_t portid);
 	void setCommandClass(uint8_t cc);
@@ -78,14 +83,18 @@ public:
 	void setDataLength(uint8_t length);
 	void setData(void * data);
 	void setData(void * data, uint8_t length);
-	void copyDataFrom(void * data, uint8_t length, uint8_t offset = 0);
+	void copyDataFrom(const void * data, uint8_t length, uint8_t offset = 0);
 
-	RdmUid getSource();
-	uint8_t getCommandClass();
-	uint16_t getParameterID();
-	uint8_t getDataLength();
-	void *	getData();
-	string  getDataAsString();
+	RdmUid		getSource();
+	uint8_t		getTransactionNumber();
+	uint8_t		getCommandClass();
+	uint16_t	getParameterID();
+	uint8_t		getDataLength();
+	void *		getData();
+	uint8_t *	getDataBytes();
+	string		getDataAsString(uint8_t offset = 0);
+	uint16_t	getDataAsUint16(uint8_t offset = 0);
+	RdmUid		getDataAsUid(uint8_t offset = 0);
 
 	uint16_t calcChecksum();
 	uint16_t getChecksum();
@@ -101,9 +110,11 @@ protected:
 	std::vector<unsigned char> message;
 };
 
-RdmUid RdmDecodeUid(uint8_t * euid);
-std::string RdmUidToString(RdmUid & uid);
+bool RdmDecodeUid(uint8_t * euid, RdmUid & uid);
+std::string RdmUidToString(const RdmUid & uid);
+uint64_t RdmUidToUint64(const RdmUid & uid);
+RdmUid RdmUidFromUint64(uint64_t i);
 
-void RdmDiscovery(RdmMessage & msg);
+void RdmDiscovery(RdmMessage & msg, const RdmUid & lowerBound, const RdmUid & upperBound);
 RdmUid RdmAllDevicesUid();
 RdmUid RdmZeroUid();
