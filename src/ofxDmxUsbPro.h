@@ -20,16 +20,19 @@ public:
 	void sendRdm(uint8_t * rdm, size_t length);
 	void sendRdm(RdmMessage & rdm);
 	void setReceiveDmxOnChange(bool dmxChangeOnly);
-	void sendRdmDiscovery();
+	void sendRdmDiscovery(const RdmUid & from, const RdmUid & to);
 
 
 	// Blocking functions
 
-	bool getRdm(RdmUid & uid, uint16_t pid, RdmMessage & msg);
 	void getWidgetParameters();
 	uint32_t getSerialNumber();
 	string getSerialString();
 	RdmUid getUid();
+	bool getRdm(RdmMessage & send, RdmMessage & reply);
+	bool getRdm(RdmUid & uid, uint16_t pid, RdmMessage & reply);
+	bool getRdmDiscovery(const RdmUid & from, const RdmUid & to, vector<RdmUid> & deviceUids);
+	bool getRdmDiscoveryFull(vector<RdmUid> & deviceUids);
 
 	struct {
 		unsigned char FirmwareLSB;
@@ -39,6 +42,7 @@ public:
 		unsigned char RefreshRate;
 	} widgetParameters;
 	uint32_t serialNumber;
+	uint8_t hardwareVersion;
 
 	typedef struct {
 		uint8_t *	data;
@@ -60,4 +64,6 @@ protected:
 
 	ofSerial serial;
 	vector<unsigned char> message;
+	vector<unsigned char> cosData;
+	uint8_t rdmTransactionNumber;
 };
