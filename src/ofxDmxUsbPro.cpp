@@ -52,7 +52,8 @@ void ofxDmxUsbPro::update() {
 				}
 				if (startCode == SC_RDM) { // RDM
 					RdmMessage rdm(data + 1, length - 1);
-					ofNotifyEvent(rdmReceived, rdm, this);
+					if (rdm.validateChecksum())
+						ofNotifyEvent(rdmReceived, rdm, this);
 				}
 				if (startCode == 0xFE || startCode == 0xAA) { // RDM DISC_UNIQUE_BRANCH response
 					RdmUid uid;
@@ -167,7 +168,7 @@ bool ofxDmxUsbPro::getRdm(RdmMessage & send, RdmMessage & reply) {
 		uint8_t startCode = data[1];
 		if (status == 0 && startCode == SC_RDM) {
 			reply.setPacket(data + 1, getLength() - 1);
-			return reply.getTransactionNumber() == send.getTransactionNumber() && reply.getParameterID() == send.getParameterID();
+			return reply.validateChecksum() && reply.getTransactionNumber() == send.getTransactionNumber() && reply.getParameterID() == send.getParameterID();
 		}
 	}
 	else
