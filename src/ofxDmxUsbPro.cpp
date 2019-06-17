@@ -23,24 +23,59 @@ ofxDmxUsbPro::ofxDmxUsbPro() {
 	rdmTransactionNumber = 0;
 }
 
+void ofxDmxUsbPro::listDevices() {
+	serial.listDevices();
+}
+
+vector<ofSerialDeviceInfo> ofxDmxUsbPro::getDeviceList() {
+	return serial.getDeviceList();
+}
+
+int ofxDmxUsbPro::getNumDevices() {
+	return serial.getDeviceList().size();
+}
+
 bool ofxDmxUsbPro::setup(int deviceNumber) {
-	return serial.setup(deviceNumber, 57600);
+	if (serial.setup(deviceNumber, 57600))
+		return init();
+	else
+		return false;
 }
 
 bool ofxDmxUsbPro::setup(string portName) {
-	return serial.setup(portName, 57600);
+	if (serial.setup(portName, 57600))
+		return init();
+	else
+		return false;
+}
+
+bool ofxDmxUsbPro::init() {
+	requestWidgetParameters();
+	bool r = waitForReply(LABEL_GET_WIDGET_PARAMS);
+	if (r) {
+		memcpy(&widgetParameters, getData(), sizeof(widgetParameters));
+		ofLogVerbose("ofxDmxUsbPro") << "Serial device is a Dmx Usb Pro";
+	}
+	else {
+		ofLogError("ofxDmxUsbPro") << "Serial device could not bea identified as a Dmx Usb Pro.";
+		serial.close();
+	}
+	return r;
 }
 
 void ofxDmxUsbPro::update() {
-	while(receiveMessage() > 0) {
-		if (message[0] == DMX_START_CODE) {
-			uint8_t label = message[1];
-			uint16_t length = getLength();
-			uint8_t * data = getData();
+	while(receiveMessage() >= 5) {
+
+		uint8_t label = getLabel();
+		uint16_t length = getLength();
+		uint8_t * data = getData();
+
+		if (message[0] == DMX_START_CODE && data != nullptr) {
+
 			if (label == LABEL_GET_WIDGET_PARAMS && length >= sizeof(widgetParameters)) {
 				memcpy(&widgetParameters, data, sizeof(widgetParameters));
 			}
-			if (label == LABEL_PACKET_RECEIVED) {
+			if (label == LABEL_PACKET_RECEIVED && length >= 2) {
 				uint8_t status = data[0];
 				uint8_t startCode = data[1];
 
@@ -90,16 +125,14 @@ void ofxDmxUsbPro::update() {
 }
 
 void ofxDmxUsbPro::requestWidgetParameters() {
-	prepareMessage(LABEL_GET_WIDGET_PARAMS, 2);
-	uint8_t * data = getData();
+	uint8_t * data = prepareMessage(LABEL_GET_WIDGET_PARAMS, 2);
 	data[0] = 0;
 	data[1] = 0;
 	sendMessage();
 }
 
 void ofxDmxUsbPro::setWidgetParameters(uint8_t breakTime, uint8_t mabTime, uint8_t refreshRate) {
-	prepareMessage(LABEL_SET_WIDGET_PARAMS, 5);
-	uint8_t * data = getData();
+	uint8_t * data = prepareMessage(LABEL_SET_WIDGET_PARAMS, 5);
 	data[0] = 0;
 	data[1] = 0;
 	data[2] = breakTime;
@@ -113,23 +146,23 @@ void ofxDmxUsbPro::requestSerialNumber() {
 	sendMessage();
 }
 
-void ofxDmxUsbPro::sendDmx(uint8_t * dmx, size_t length) {
-	size_t size = length;
+void ofxDmxUsbPro::sendDmx(uint8_t * dmx, size_t length, uint16_t channel) {
+	size_t size = channel + length;
 	if (length < 24)
 		size = 24;
-	if (length > 512)
+	if (size > 512) {
 		size = 512;
+		length = 512 - channel;
+	}
 
-	prepareMessage(LABEL_SEND_DMX, size + 1);
-	uint8_t * data = getData();
+	uint8_t * data = prepareMessage(LABEL_SEND_DMX, size + 1);
 	data[0] = 0;
-	memcpy(data + 1, dmx, length);
+	memcpy(data + 1 + channel, dmx, length);
 	sendMessage();
 }
 
 void ofxDmxUsbPro::sendRdm(uint8_t * rdm, size_t length) {
-	prepareMessage(LABEL_SEND_RDM, length);
-	uint8_t * data = getData();
+	uint8_t * data = prepareMessage(LABEL_SEND_RDM, length);
 	memcpy(data, rdm, length);
 	sendMessage();
 }
@@ -142,8 +175,7 @@ void ofxDmxUsbPro::sendRdm(RdmMessage & rdm) {
 }
 
 void ofxDmxUsbPro::setReceiveDmxOnChange(bool dmxChangeOnly) {
-	prepareMessage(LABEL_SET_DMX_CHANGE, 1);
-	uint8_t * data = getData();
+	uint8_t * data = prepareMessage(LABEL_SET_DMX_CHANGE, 1);
 	data[0] = dmxChangeOnly ? 1 : 0;
 	sendMessage();
 }
@@ -264,28 +296,42 @@ RdmUid ofxDmxUsbPro::getUid() {
 	return uid;
 }
 
-void ofxDmxUsbPro::prepareMessage(uint8_t label, size_t length) {
+uint8_t * ofxDmxUsbPro::prepareMessage(uint8_t label, size_t length) {
 	message.resize(length + 5);
 	message[0] = DMX_START_CODE;
 	message[1] = label;
 	message[2] = length & 0xFF;
 	message[3] = (length >> 8) & 0xFF;
 	message[length+4] = DMX_END_CODE;
+	return getData();
+}
+
+uint8_t ofxDmxUsbPro::getLabel() {
+	return message.size() < 2 ? 0 : message[1];
 }
 
 uint8_t * ofxDmxUsbPro::getData() {
-	return &message[4];
+	return message.size() < 5 ? nullptr : &message[4];
 }
 
 uint16_t ofxDmxUsbPro::getLength() {
-	return message[2] | (message[3] << 8);
+	if (message.size() < 4)
+		return 0;
+
+	uint16_t length = message[2] | (message[3] << 8);
+	return MIN(length, MAX(0, message.size()-5));
 }
 
 void ofxDmxUsbPro::sendMessage() {
+	if (!serial.isInitialized())
+		return;
+
 	serial.writeBytes(message.data(), message.size());
 }
 
 int ofxDmxUsbPro::receiveMessage() {
+	if (!serial.isInitialized())
+		return -1;
 	int n = serial.available();
 	if (n > 0) {
 		message.resize(n);
@@ -297,16 +343,18 @@ int ofxDmxUsbPro::receiveMessage() {
 	return 0;
 }
 
-bool ofxDmxUsbPro::waitForReply(uint8_t label, uint64_t timeOutMicros) {
+bool ofxDmxUsbPro::waitForReply(uint8_t label, size_t length, uint64_t timeOutMicros) {
+	if (!serial.isInitialized())
+		return false;
 	uint64_t now = ofGetElapsedTimeMicros();
 	uint64_t time = 0;
-	int n = receiveMessage();
-	while (n == 0 && time < timeOutMicros) {
+	size_t n = receiveMessage();
+	while (n < length && time < timeOutMicros) {
 		ofSleepMillis(1);
 		n = receiveMessage();
 		if (n > 0 && message[1] != label)
 			n = 0;
 		time = ofGetElapsedTimeMicros() - now;
 	}
-	return n > 0;
+	return n >= length;
 }

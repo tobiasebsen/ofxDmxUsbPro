@@ -7,8 +7,13 @@ class ofxDmxUsbPro {
 public:
 	ofxDmxUsbPro();
 
+	void listDevices();
+	vector <ofSerialDeviceInfo> getDeviceList();
+	int getNumDevices();
+
 	bool setup(int deviceNumber = 0);
 	bool setup(string portName);
+
 	void update();
 
 	// Non-blocking functions
@@ -16,11 +21,11 @@ public:
 	void requestWidgetParameters();
 	void setWidgetParameters(uint8_t breakTime = 9, uint8_t mabTime = 1, uint8_t refreshRate = 40);
 	void requestSerialNumber();
-	void sendDmx(uint8_t * dmx, size_t length);
+	void sendDmx(uint8_t * dmx, size_t length, uint16_t channel = 0);
 	void sendRdm(uint8_t * rdm, size_t length);
 	void sendRdm(RdmMessage & rdm);
 	void setReceiveDmxOnChange(bool dmxChangeOnly);
-	void sendRdmDiscovery(const RdmUid & from, const RdmUid & to);
+	void sendRdmDiscovery(const RdmUid & from = rdmUidZero, const RdmUid & to = rdmUidAllDevices);
 
 
 	// Blocking functions
@@ -55,12 +60,14 @@ public:
 
 protected:
 
-	void prepareMessage(uint8_t label, size_t length);
+	bool init();
+	uint8_t * prepareMessage(uint8_t label, size_t length);
+	uint8_t getLabel();
 	uint8_t * getData();
 	uint16_t getLength();
 	void sendMessage();
 	int receiveMessage();
-	bool waitForReply(uint8_t label, uint64_t timeOutMicros = 1000000);
+	bool waitForReply(uint8_t label, size_t length = 0, uint64_t timeOutMicros = 1000000);
 
 	ofSerial serial;
 	vector<unsigned char> message;

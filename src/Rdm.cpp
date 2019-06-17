@@ -1,4 +1,5 @@
 #include "Rdm.h"
+#include <sstream>
 
 RdmMessage::RdmMessage() {
 }
@@ -75,6 +76,11 @@ void RdmMessage::setData(void * data, uint8_t length) {
 	setData(data);
 }
 
+void RdmMessage::setData(uint8_t d, uint8_t offset) {
+	uint8_t * data = getDataBytes() + offset;
+	data[0] = d;
+}
+
 void RdmMessage::copyDataFrom(const void * data, uint8_t length, uint8_t offset) {
 	memcpy(message.data() + sizeof(RdmHeader) + offset, data, length);
 }
@@ -118,7 +124,7 @@ string RdmMessage::getDataAsString(uint8_t offset) {
 
 uint16_t RdmMessage::getDataAsUint16(uint8_t offset) {
 	uint8_t * data = getDataBytes() + offset;
-	return data[1] << 8 | data[0];
+	return data[0] << 8 | data[1];
 }
 
 RdmUid RdmMessage::getDataAsUid(uint8_t offset) {
@@ -220,6 +226,15 @@ std::string RdmUidToString(const RdmUid & uid) {
 	char sz[13];
 	sprintf(sz, "%02X%02X%02X%02X%02X%02X", uid.uid[0], uid.uid[1], uid.uid[2], uid.uid[3], uid.uid[4], uid.uid[5]);
 	return std::string(sz);
+}
+
+RdmUid RdmUidFromString(const string & uidStr) {
+	RdmUid uid;
+	for (int i=0; i<6; i++) {
+		string s = uidStr.substr(i*2, 2);
+		uid.uid[i] = stoi(s, nullptr, 16);
+	}
+	return uid;
 }
 
 uint64_t RdmUidToUint64(const RdmUid & uid) {

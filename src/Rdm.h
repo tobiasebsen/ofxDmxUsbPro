@@ -29,9 +29,12 @@ using namespace std;
 #define SUPPORTED_PARAMETERS		0x0050
 #define PARAMETER_DESCRIPTION		0x0051
 #define DEVICE_INFO					0x0060
+#define DEVICE_MODEL_DESCRIPTION	0x0080
+#define MANUFACTURER_LABEL			0x0081
 #define SOFTWARE_VERSION_LABEL		0x00C0
 #define DMX_START_ADDRESS			0x00F0
 #define IDENTIFY_DEVICE				0x1000
+#define RESET_DEVICE				0x1001
 
 #define STATUS_NONE					0x00
 #define STATUS_GET_LAST_MESSAGE		0x01
@@ -66,6 +69,9 @@ typedef struct {
 } RdmHeader;
 #pragma pack()
 
+const RdmUid rdmUidZero = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+const RdmUid rdmUidAllDevices = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+
 class RdmMessage {
 public:
 	RdmMessage();
@@ -83,6 +89,7 @@ public:
 	void setDataLength(uint8_t length);
 	void setData(void * data);
 	void setData(void * data, uint8_t length);
+	void setData(uint8_t data, uint8_t offset = 0);
 	void copyDataFrom(const void * data, uint8_t length, uint8_t offset = 0);
 
 	RdmUid		getSource();
@@ -112,6 +119,7 @@ protected:
 
 bool RdmDecodeUid(uint8_t * euid, RdmUid & uid);
 std::string RdmUidToString(const RdmUid & uid);
+RdmUid RdmUidFromString(const string & uidStr);
 uint64_t RdmUidToUint64(const RdmUid & uid);
 RdmUid RdmUidFromUint64(uint64_t i);
 
